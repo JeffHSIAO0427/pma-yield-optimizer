@@ -1,0 +1,14 @@
+name: pma-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy<2
+  - pandas
+  - scikit-learn
+  - openpyxl
+  - pip:
+      - streamlit
+      - tensorflow-cpu
