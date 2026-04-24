@@ -1,6 +1,6 @@
 streamlit
-numpy==1.26.4
-pandas==2.2.2
-tensorflow-cpu==2.16.1
-scikit-learn==1.4.2
+numpy<2
+pandas
+tensorflow-cpu
+scikit-learn
 openpyxl
