@@ -21,35 +21,41 @@ MW_PMA = 132.16
 # =========================================================
 @st.cache_resource
 def load_models():
-    expert_dir = '分析結果0423_專家優化'
-    distill_dir = '分析結果0423_專屬優化'
-    reactor_dir = '分析結果0423'
+    model_dir = 'models_v5'
+    
+    if not os.path.exists(model_dir):
+        st.error(f"找不到模型資料夾: {model_dir}。請確認 GitHub 上資料夾名稱已改為 models_v5。")
+        st.stop()
     
     m = {}
-    # 品質與流量
-    m['s_pu'] = pickle.load(open(os.path.join(expert_dir, 'purity_scalers.pkl'), 'rb'))
-    m['mod_pu'] = tf.keras.models.load_model(os.path.join(expert_dir, 'model_purity_expert_log.h5'), compile=False)
-    m['s_fl'] = pickle.load(open(os.path.join(expert_dir, 'flow_master_scalers.pkl'), 'rb'))
-    m['mod_fl'] = tf.keras.models.load_model(os.path.join(expert_dir, 'model_flow_master_final.h5'), compile=False)
-    m['s_aa'] = pickle.load(open(os.path.join(expert_dir, 'aa_ppm_scalers.pkl'), 'rb'))
-    m['mod_aa'] = tf.keras.models.load_model(os.path.join(expert_dir, 'model_aa_ppm_hifi.h5'), compile=False)
-    
-    # 反應器
-    m['s_r1'] = pickle.load(open(os.path.join(reactor_dir, 'x_scaler.pkl'), 'rb'))
-    m['s_r1_y'] = pickle.load(open(os.path.join(reactor_dir, 'y_scalers.pkl'), 'rb'))
-    m['mod_r_ene'] = tf.keras.models.load_model(os.path.join(reactor_dir, 'model_Heater_Energy_Consumption_kW.h5'), compile=False)
-    m['mod_r_pma'] = tf.keras.models.load_model(os.path.join(reactor_dir, 'model_Reactor_PMA_Flow_kmol_h.h5'), compile=False)
-    m['mod_r_aa'] = tf.keras.models.load_model(os.path.join(reactor_dir, 'model_Reactor_AA_Flow_kmol_h.h5'), compile=False)
-    m['mod_r_pgme'] = tf.keras.models.load_model(os.path.join(reactor_dir, 'model_Reactor_PGME_Flow_kmol_h.h5'), compile=False)
-    
-    # 分離能耗 (v5)
-    m['s_ene_hifi'] = pickle.load(open(os.path.join(distill_dir, 'energy_hifi_scalers.pkl'), 'rb'))
-    m['mod_d_ene'] = {
-        'C1_Cond': tf.keras.models.load_model(os.path.join(distill_dir, 'model_stage2_C1_Cond_optimized.h5'), compile=False),
-        'C1_Reb': tf.keras.models.load_model(os.path.join(distill_dir, 'model_stage2_C1_Reb_optimized.h5'), compile=False),
-        'C2_Cond': tf.keras.models.load_model(os.path.join(distill_dir, 'model_stage2_C2_Cond_optimized.h5'), compile=False),
-        'C2_Reb': tf.keras.models.load_model(os.path.join(distill_dir, 'model_stage2_C2_Reb_optimized.h5'), compile=False)
-    }
+    try:
+        # 品質與流量
+        m['s_pu'] = pickle.load(open(os.path.join(model_dir, 'purity_scalers.pkl'), 'rb'))
+        m['mod_pu'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_purity_expert_log.h5'), compile=False)
+        m['s_fl'] = pickle.load(open(os.path.join(model_dir, 'flow_master_scalers.pkl'), 'rb'))
+        m['mod_fl'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_flow_master_final.h5'), compile=False)
+        m['s_aa'] = pickle.load(open(os.path.join(model_dir, 'aa_ppm_scalers.pkl'), 'rb'))
+        m['mod_aa'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_aa_ppm_hifi.h5'), compile=False)
+        
+        # 反應器
+        m['s_r1'] = pickle.load(open(os.path.join(model_dir, 'x_scaler.pkl'), 'rb'))
+        m['s_r1_y'] = pickle.load(open(os.path.join(model_dir, 'y_scalers.pkl'), 'rb'))
+        m['mod_r_ene'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_Heater_Energy_Consumption_kW.h5'), compile=False)
+        m['mod_r_pma'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_Reactor_PMA_Flow_kmol_h.h5'), compile=False)
+        m['mod_r_aa'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_Reactor_AA_Flow_kmol_h.h5'), compile=False)
+        m['mod_r_pgme'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_Reactor_PGME_Flow_kmol_h.h5'), compile=False)
+        
+        # 分離能耗 (v5 高精度)
+        m['s_ene_hifi'] = pickle.load(open(os.path.join(model_dir, 'energy_hifi_scalers.pkl'), 'rb'))
+        m['mod_d_ene'] = {
+            'C1_Cond': tf.keras.models.load_model(os.path.join(model_dir, 'model_stage2_C1_Cond_optimized.h5'), compile=False),
+            'C1_Reb': tf.keras.models.load_model(os.path.join(model_dir, 'model_stage2_C1_Reb_optimized.h5'), compile=False),
+            'C2_Cond': tf.keras.models.load_model(os.path.join(model_dir, 'model_stage2_C2_Cond_optimized.h5'), compile=False),
+            'C2_Reb': tf.keras.models.load_model(os.path.join(model_dir, 'model_stage2_C2_Reb_optimized.h5'), compile=False)
+        }
+    except Exception as e:
+        st.error(f"加載模型檔案時發生錯誤: {e}")
+        st.stop()
     return m
 
 # =========================================================
@@ -101,7 +107,7 @@ try:
     p_log = M['s_pu']['y_scaler'].inverse_transform(M['mod_pu'].predict(M['s_pu']['x_scaler'].transform(x_pu_in), verbose=0))[0,0]
     purity = np.clip(100.0001 - (10**p_log), 0, 100)
     
-    # 能耗詳情
+    # 能耗詳情 (v5)
     total_sep = 0
     ene_vals = {}
     for t in ['C1_Cond', 'C1_Reb', 'C2_Cond', 'C2_Reb']:
@@ -118,12 +124,12 @@ try:
     # =========================================================
     # 4. UI 渲染
     # =========================================================
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("✨ 預測純度", f"{purity:.4f} %"); c1.progress(float(np.clip(purity/100, 0.0, 1.0)))
-    c2.metric("📈 總產率", f"{total_yield:.2f} %")
-    c3.metric("📦 質量流率", f"{m_flow*MW_PMA:.2f} kg/h", f"{m_flow:.4f} kmol/h")
-    c4.metric("🧪 AA 含量", f"{aa_ppm:.2f} ppm")
-    c5.metric("⚡ 系統總能耗", f"{total_sys_ene:.2f} kW")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("✨ 預測純度", f"{purity:.4f} %"); col1.progress(float(np.clip(purity/100, 0.0, 1.0)))
+    col2.metric("📈 總產率", f"{total_yield:.2f} %")
+    col3.metric("📦 質量流率", f"{m_flow*MW_PMA:.2f} kg/h", f"{m_flow:.4f} kmol/h")
+    col4.metric("🧪 AA 含量", f"{aa_ppm:.2f} ppm")
+    col5.metric("⚡ 系統總能耗", f"{total_sys_ene:.2f} kW")
 
     st.write("---")
     t1, t2, t3 = st.tabs(["📌 反應器詳情", "📌 分離塔詳情", "🏆 最佳優化方案 (v5)"])
@@ -167,7 +173,6 @@ try:
 
 except Exception as e:
     st.error(f"系統運行錯誤: {e}")
-    st.info("請檢查模型路徑與檔案完整性。")
 
 st.markdown("---")
 st.caption("PMA AI Production Optimization System © 2023 | 數據由 DWSIM 模擬與 集成專家模型 驅動")
