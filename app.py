@@ -9,6 +9,7 @@ import tensorflow as tf
 st.set_page_config(page_title="ANN 電子級 PMA 優化系統", layout="wide")
 
 st.title("人工類神經網路（ANN）應用於電子級 PMA 製程之產率預測與參數優化")
+st.write("本平台為碩士研究相關之電子級 PMA 製程預測與操作條件分析展示頁面，使用 Streamlit 建立。")
 
 # 插入製程流程圖
 if os.path.exists("電子級PMA 製程流程圖.png"):
