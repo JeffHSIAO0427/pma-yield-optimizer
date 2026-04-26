@@ -88,20 +88,41 @@ try:
     # --- 1. 反應器預測 ---
     r_in_s = M['s_r1'].transform([[T, Fin, Raa, 1-Raa]])
     h_ene = M['s_r1_y']['Heater Energy Consumption (kW)'].inverse_transform(M['mod_r_ene'].predict(r_in_s, verbose=0))[0,0]
-    r_aa_out = np.expm1(M['s_r1_y']['Reactor AA Flow (kmol/h)'].inverse_transform(M['mod_r_aa'].predict(r_in_s, verbose=0)))[0,0]
-    r_pg_out = np.expm1(M['s_r1_y']['Reactor PGME Flow (kmol/h)'].inverse_transform(M['mod_r_pgme'].predict(r_in_s, verbose=0)))[0,0]
+
+    # 【關鍵修正】以 PMA 產量作為物理核心，反推其他組分
     r_pma_out = np.expm1(M['s_r1_y']['Reactor PMA Flow (kmol/h)'].inverse_transform(M['mod_r_pma'].predict(r_in_s, verbose=0)))[0,0]
-    
+
     aa_in_flow = Fin * Raa
+    pgme_in_flow = Fin * (1 - Raa)
+
+    # 依據化學計量比 1:1 進行物理連動
+    r_aa_out = max(0, aa_in_flow - r_pma_out)
+    r_pg_out = max(0, pgme_in_flow - r_pma_out)
+
     aa_conv = (aa_in_flow - r_aa_out) / (aa_in_flow + 1e-9) * 100
+    pgme_conv = (pgme_in_flow - r_pg_out) / (pgme_in_flow + 1e-9) * 100
+
+    # 判斷限量試劑
+    if aa_in_flow < pgme_in_flow:
+        limiting_reagent = "AA (醋酸)"
+    elif pgme_in_flow < aa_in_flow:
+        limiting_reagent = "PGME (丙二醇甲醚)"
+    else:
+        limiting_reagent = "等摩爾進料"
     
     # --- 2. 分離塔預測 ---
     x_distill = [C1_R, C1_B, C1_P, C2_R, C2_B, C2_P]
     x_df_e2e = pd.DataFrame([[T, Fin, Raa] + x_distill], columns=['T', 'Flow_In', 'Ratio_AA', 'C1_R', 'C1_B', 'C1_P', 'C2_R', 'C2_B', 'C2_P'])
     
-    # 產量與品質
-    m_flow = np.expm1(M['s_fl']['y_s'].inverse_transform(M['mod_fl'].predict(M['s_fl']['x_s'].transform(x_df_e2e), verbose=0)))[0,0]
-    aa_ppm = np.expm1(M['s_aa']['y_s'].inverse_transform(M['mod_aa'].predict(M['s_aa']['x_s'].transform(x_df_e2e), verbose=0)))[0,0]
+    # 流量與 AA
+    m_flow_raw = np.expm1(M['s_fl']['y_s'].inverse_transform(M['mod_fl'].predict(M['s_fl']['x_s'].transform(x_df_e2e), verbose=0)))[0,0]
+
+    # 【核心修正】物理約束：產品流量不能超過反應器 PMA 產量的 99% (強制物料平衡)
+    m_flow = np.minimum(m_flow_raw, r_pma_out * 0.99)
+
+    aa_s = M['s_aa']['y_s'].inverse_transform(M['mod_aa'].predict(M['s_aa']['x_s'].transform(x_df_e2e), verbose=0))
+    aa_ppm = np.expm1(aa_s)[0,0]
+
     
     # 純度與能耗 (串聯)
     x_pu_in = pd.DataFrame([[r_aa_out, r_pg_out, r_pma_out] + x_distill], columns=['R_AA', 'R_PGME', 'R_PMA', 'C1_R', 'C1_B', 'C1_P', 'C2_R', 'C2_B', 'C2_P'])
@@ -125,12 +146,55 @@ try:
     # =========================================================
     # 4. UI 渲染
     # =========================================================
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("✨ 預測純度", f"{purity:.4f} %"); col1.progress(float(np.clip(purity/100, 0.0, 1.0)))
-    col2.metric("📈 總產率", f"{total_yield:.2f} %")
-    col3.metric("📦 質量流率", f"{m_flow*MW_PMA:.2f} kg/h", f"{m_flow:.4f} kmol/h")
-    col4.metric("🧪 AA 含量", f"{aa_ppm:.2f} ppm")
-    col5.metric("⚡ 系統總能耗", f"{total_sys_ene:.2f} kW")
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("✨ 預測純度", f"{purity:.4f} %"); c1.progress(float(np.clip(purity/100, 0.0, 1.0)))
+
+    # 總產率指標與彈出公式
+    with c2:
+        st.metric("📈 總產率", f"{total_yield:.2f} %")
+        with st.popover("🧮 計算過程詳解"):
+            st.markdown("### **製程指標動態計算式**")
+
+            # 計算中間指標
+            pma_recovery = (m_flow / (r_pma_out + 1e-9)) * 100
+            yield_method_2 = (aa_conv / 100) * (pma_recovery / 100) * 100
+
+            st.markdown("#### **1. 反應器轉化率 (Conversion)**")
+            st.latex(r"X = \frac{\dot{n}_{in} - \dot{n}_{out}}{\dot{n}_{in}} \times 100\%")
+            st.code(f"AA 轉化率: ({aa_in_flow:.4f} - {r_aa_out:.4f}) / {aa_in_flow:.4f} × 100% = {aa_conv:.2f}%", language="text")
+            st.code(f"PGME 轉化率: ({pgme_in_flow:.4f} - {r_pg_out:.4f}) / {pgme_in_flow:.4f} × 100% = {pgme_conv:.2f}%", language="text")
+
+            st.write("---")
+
+            st.markdown("#### **2. 分離回收率 (Recovery)**")
+            st.latex(r"\eta_{PMA} = \frac{\dot{n}_{PMA, product}}{\dot{n}_{PMA, out}} \times 100\%")
+            st.code(f"計算: {m_flow:.4f} / {r_pma_out:.4f} × 100% = {pma_recovery:.2f}%", language="text")
+
+            st.write("---")
+
+            st.markdown("#### **3. 總產率算法對比 (Total Yield)**")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.write("**方法 A (一步綜合法)**")
+                st.latex(r"Y_{Total} = \frac{\dot{n}_{PMA, product}}{\dot{n}_{AA, feed}} \times 100\%")
+                st.code(f"計算: {m_flow:.4f} / {aa_in_flow:.4f} × 100% = {total_yield:.2f}%", language="text")
+            with col_b:
+                st.write("**方法 B (分段乘積法)**")
+                st.latex(r"Y_{Total} = X_{AA} \times \eta_{PMA}")
+                st.code(f"計算: {aa_conv/100:.4f} × {pma_recovery/100:.4f} × 100% = {yield_method_2:.2f}%", language="text")
+
+            diff = abs(total_yield - yield_method_2)
+            if diff > 1:
+                st.warning(f"⚠️ 算法偏差: {diff:.2f}%。原因：ANN模型獨立預測產生的數值偏移或製程副反應損失。")
+            else:
+                st.success(f"✅ 算法一致。偏差僅 {diff:.2f}%。")
+
+            st.info(f"💡 目前限量試劑為: **{limiting_reagent}**")
+
+    c3.metric("📦 質量流率", f"{m_flow*MW_PMA:.2f} kg/h", f"{m_flow:.4f} kmol/h")
+    c4.metric("🧪 AA 含量", f"{aa_ppm:.2f} ppm")
+    c5.metric("⚡ 系統總能耗", f"{total_sys_ene:.2f} kW")
+
 
     st.write("---")
     t1, t2, t3 = st.tabs(["📌 反應器詳情", "📌 分離塔詳情", "🏆 最佳優化方案 (v5)"])
@@ -145,8 +209,10 @@ try:
                 "反應器出口": [f"{r_aa_out:.4f}", f"{r_pg_out:.4f}", f"{r_pma_out:.4f}", f"{r_pma_out:.4f}"]
             }))
         with cc2:
-            st.markdown("#### **關鍵指標**")
+            st.markdown("#### **反應指標**")
+            st.info(f"**限量試劑:** {limiting_reagent}")
             st.info(f"**AA 轉化率:** {aa_conv:.2f} %")
+            st.info(f"**PGME 轉化率:** {pgme_conv:.2f} %")
             st.info(f"**Heater 能耗:** {h_ene:.2f} kW")
 
     with t2:
@@ -164,12 +230,12 @@ try:
             st.success(f"**系統總耗能:** {total_sys_ene:.2f} kW")
 
     with t3:
-        st.markdown("#### **根據 30 萬組全域搜尋獲得的最佳建議方案 (純度 ≥ 99.99%)**")
+        st.markdown("#### **根據 30 萬組全域搜尋獲得的最佳建議方案 (純度 ≥ 99.99% & 物理嚴謹版)**")
         st.table(pd.DataFrame({
             "指標": ["溫度 (°C)", "流量 (kmol/h)", "進料比_AA", "R1/B1/P1", "R2/B2/P2", "預測純度 (%)", "AA 含量 (ppm)", "PMA 摩爾流量 (kmol/h)", "質量流率 (kg/h)", "總產率 (%)", "總能耗 (kW)"],
-            "Case 1 (節能)": ["97.42", "14.93", "0.489", "5.06/9.73/7237", "7.28/8.56/7247", "99.9902", "72.16", "2.0259", "267.75", "27.75", "1250.52"],
-            "Case 2 (產能)": ["110.00", "105.91", "0.484", "6.33/9.66/8484", "5.10/8.70/8154", "99.9913", "67.63", "20.7866", "2747.16", "40.55", "13877.90"],
-            "Case 3 (平衡)": ["109.41", "72.80", "0.470", "5.64/9.13/9629", "8.44/7.97/7520", "99.9922", "48.63", "16.9144", "2235.41", "49.43", "9569.12"]
+            "Case 1 (節能)": ["82.72", "13.84", "0.528", "5.85/9.88/8181", "6.99/6.99/7022", "99.9912", "78.43", "2.1547", "284.76", "29.49", "1304.43"],
+            "Case 2 (產能)": ["101.07", "112.50", "0.534", "5.70/9.71/8480", "8.17/9.17/7084", "99.9903", "88.12", "21.7156", "2870.53", "36.15", "14964.14"],
+            "Case 3 (平衡)": ["109.03", "71.25", "0.509", "5.07/9.31/9619", "9.89/7.64/7102", "99.9917", "62.45", "16.2179", "2143.36", "44.72", "9077.31"]
         }))
 
 except Exception as e:
