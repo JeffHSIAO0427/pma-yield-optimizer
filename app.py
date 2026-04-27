@@ -8,6 +8,19 @@ import tensorflow as tf
 # 設定網頁標題與版面
 st.set_page_config(page_title="ANN 電子級 PMA 優化系統", layout="wide")
 
+# --- Google Analytics 匿名統計 ---
+GA_ID = 'G-7TKCC4EV45'
+ga_code = f"""
+    <script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){{dataLayer.push(arguments);}}
+        gtag('js', new Date());
+        gtag('config', '{GA_ID}');
+    </script>
+"""
+st.components.v1.html(ga_code, height=0)
+
 st.title("人工類神經網路（ANN）應用於電子級 PMA 製程之產率預測與參數優化")
 st.write("本平台為碩士研究相關之電子級 PMA 製程預測與操作條件分析展示頁面，使用 Streamlit 建立。")
 
