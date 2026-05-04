@@ -115,7 +115,20 @@ try:
         with cc2:
             st.info(f"**限量試劑:** {lim_reagent}"); st.info(f"**AA 轉化率:** {aa_conv:.2f} %"); st.info(f"**Heater 能耗:** {h_ene:.2f} kW")
     with t2:
-        st.table(pd.DataFrame({"換熱器": ["C1 Cond", "C1 Reb", "C2 Cond", "C2 Reb"], "負荷 (kW)": [f"{ene_vals['C1_Cond']:.2f}", f"{ene_vals['C1_Reb']:.2f}", f"{ene_vals['C2_Cond']:.2f}", f"{ene_vals['C2_Reb']:.2f}"]}))
+        cc3, cc4 = st.columns(2)
+        with cc3:
+            st.markdown("#### **分離能耗詳情 (kW)**")
+            st.table(pd.DataFrame({
+                "換熱器": ["C1 Condenser", "C1 Reboiler", "C2 Condenser", "C2 Reboiler"],
+                "負荷 (kW)": [f"{ene_vals['C1_Cond']:.2f}", f"{ene_vals['C1_Reb']:.2f}", f"{ene_vals['C2_Cond']:.2f}", f"{ene_vals['C2_Reb']:.2f}"]
+            }))
+        with cc4:
+            st.markdown("#### **最終產品與能耗指標**")
+            st.success(f"**PMA 摩爾流量:** {m_flow:.4f} kmol/h")
+            st.success(f"**PMA 質量流率:** {m_flow*MW_PMA:.2f} kg/h")
+            st.success(f"**最終產品純度:** {purity:.4f} %")
+            st.success(f"**總產率 (限量基準):** {total_yield:.2f} %")
+            st.success(f"**系統總耗能:** {total_sys_ene:.2f} kW")
     with t3:
         st.markdown("#### **v7 ReLU 物理嚴謹版最佳建議方案**")
         st.table(pd.DataFrame({
