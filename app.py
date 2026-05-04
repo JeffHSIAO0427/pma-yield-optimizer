@@ -86,25 +86,29 @@ try:
     aa_ppm = np.expm1(M['s_aa']['y_s'].inverse_transform(M['mod_aa'].predict(M['s_aa']['x_s'].transform(x_df_e2e), verbose=0)))[0,0]
     
     x_pu_in = pd.DataFrame([[r_aa_out, r_pg_out, r_pma_out, C1_R, C1_B, C1_P, C2_R, C2_B, C2_P]], columns=['R_AA', 'R_PGME', 'R_PMA', 'C1_R', 'C1_B', 'C1_P', 'C2_R', 'C2_B', 'C2_P'])
-    purity = np.clip(100.0001 - (10**M['s_pu']['y_scaler'].inverse_transform(M['mod_pu'].predict(M['s_pu']['x_scaler'].transform(x_pu_in), verbose=0))[0,0]), 0, 100)
+    p_log_res = M['s_pu']['y_scaler'].inverse_transform(M['mod_pu'].predict(M['s_pu']['x_scaler'].transform(x_pu_in), verbose=0))[0,0]
+    purity = np.clip(100.0001 - (10**p_log_res), 0, 100)
     
     total_sep, ene_vals = 0, {}
     for t in ['C1_Cond', 'C1_Reb', 'C2_Cond', 'C2_Reb']:
-        p_log = M['mod_d_ene'][t].predict(M['s_ene_hifi'][t]['sx'].transform(x_pu_in), verbose=0)[0,0]
-        v = 10**p_log; ene_vals[t] = v; total_sep += v
+        p_log_ene = M['mod_d_ene'][t].predict(M['s_ene_hifi'][t]['sx'].transform(x_pu_in), verbose=0)[0,0]
+        v = 10**p_log_ene; ene_vals[t] = v; total_sep += v
 
+    total_sys_ene = h_ene + total_sep
     limiting_in_mol = min(aa_in, pg_in)
     total_yield = (m_flow / (limiting_in_mol + 1e-9)) * 100
     
+    # UI
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("✨ 預測純度", f"{purity:.4f} %"); col1.progress(float(np.clip(purity/100, 0.0, 1.0)))
     with col2:
         st.metric("📈 總產率", f"{total_yield:.2f} %")
         with st.popover("🧮 計算過程"):
-            st.latex(r"X_{AA} = " + f"{aa_conv:.2f}\%"); st.latex(r"Y_{Total} = \frac{" + f"{m_flow:.4f}" + r"}{\min(" + f"{aa_in:.4f}, {pg_in:.4f}" + r")} = " + f"{total_yield:.2f}\%")
+            st.latex(r"X_{AA} = " + f"{aa_conv:.2f}\%")
+            st.latex(r"Y_{Total} = \frac{" + f"{m_flow:.4f}" + r"}{\min(" + f"{aa_in:.4f}, {pg_in:.4f}" + r")} = " + f"{total_yield:.2f}\%")
     col3.metric("📦 質量流率", f"{m_flow*MW_PMA:.2f} kg/h", f"{m_flow:.4f} kmol/h")
     col4.metric("🧪 AA 含量", f"{aa_ppm:.2f} ppm")
-    col5.metric("⚡ 系統總能耗", f"{h_ene + total_sep:.2f} kW")
+    col5.metric("⚡ 系統總能耗", f"{total_sys_ene:.2f} kW")
 
     st.write("---")
     t1, t2, t3 = st.tabs(["📌 反應器詳情", "📌 分離塔詳情", "🏆 最佳優化方案 (v7)"])
@@ -118,17 +122,10 @@ try:
         cc3, cc4 = st.columns(2)
         with cc3:
             st.markdown("#### **分離能耗詳情 (kW)**")
-            st.table(pd.DataFrame({
-                "換熱器": ["C1 Condenser", "C1 Reboiler", "C2 Condenser", "C2 Reboiler"],
-                "負荷 (kW)": [f"{ene_vals['C1_Cond']:.2f}", f"{ene_vals['C1_Reb']:.2f}", f"{ene_vals['C2_Cond']:.2f}", f"{ene_vals['C2_Reb']:.2f}"]
-            }))
+            st.table(pd.DataFrame({"換熱器": ["C1 Cond", "C1 Reb", "C2 Cond", "C2 Reb"], "負荷 (kW)": [f"{ene_vals['C1_Cond']:.2f}", f"{ene_vals['C1_Reb']:.2f}", f"{ene_vals['C2_Cond']:.2f}", f"{ene_vals['C2_Reb']:.2f}"]}))
         with cc4:
             st.markdown("#### **最終產品與能耗指標**")
-            st.success(f"**PMA 摩爾流量:** {m_flow:.4f} kmol/h")
-            st.success(f"**PMA 質量流率:** {m_flow*MW_PMA:.2f} kg/h")
-            st.success(f"**最終產品純度:** {purity:.4f} %")
-            st.success(f"**總產率 (限量基準):** {total_yield:.2f} %")
-            st.success(f"**系統總耗能:** {total_sys_ene:.2f} kW")
+            st.success(f"**摩爾流量:** {m_flow:.4f} kmol/h"); st.success(f"**最終純度:** {purity:.4f} %"); st.success(f"**系統總耗能:** {total_sys_ene:.2f} kW")
     with t3:
         st.markdown("#### **v7 ReLU 物理嚴謹版最佳建議方案**")
         st.table(pd.DataFrame({
