@@ -8,18 +8,27 @@ import tensorflow as tf
 # 設定網頁標題與版面
 st.set_page_config(page_title="ANN 電子級 PMA 優化系統", layout="wide")
 
-# --- Google Analytics 匿名統計 ---
+# --- Google Analytics 匿名統計 (穿透注入版) ---
 GA_ID = 'G-7TKCC4EV45'
-ga_code = f"""
-    <script async src="https://www.googletagmanager.com/gtag/js?id={GA_ID}"></script>
+ga_injection = f"""
     <script>
-        window.dataLayer = window.window.dataLayer || [];
-        function gtag(){{dataLayer.push(arguments);}}
+        // 1. 建立 GA 腳本標籤
+        var script = window.parent.document.createElement('script');
+        script.async = true;
+        script.src = "https://www.googletagmanager.com/gtag/js?id={GA_ID}";
+        window.parent.document.head.appendChild(script);
+
+        // 2. 初始化 GA 邏輯
+        window.parent.window.dataLayer = window.parent.window.dataLayer || [];
+        function gtag(){{window.parent.window.dataLayer.push(arguments);}}
         gtag('js', new Date());
         gtag('config', '{GA_ID}');
+        
+        console.log("GA4 Injected into parent head.");
     </script>
 """
-st.components.v1.html(ga_code, height=0)
+# 執行隱形注入
+st.components.v1.html(ga_injection, height=0)
 
 st.title("人工類神經網路（ANN）應用於電子級 PMA 製程之產率預測與參數優化")
 st.write("本平台為碩士研究相關之電子級 PMA 製程預測與操作條件 analysis 展示頁面，使用 Streamlit 建立。")
