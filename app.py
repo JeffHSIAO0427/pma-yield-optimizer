@@ -8,7 +8,7 @@ import tensorflow as tf
 # 設定網頁標題與版面
 st.set_page_config(page_title="ANN 電子級 PMA 優化系統", layout="wide")
 
-# --- Google Analytics 匿名統計 (穿透注入版) ---
+# --- Google Analytics 匿名統計 ---
 GA_ID = 'G-7TKCC4EV45'
 ga_injection = f"""
     <script>
@@ -49,8 +49,6 @@ def load_models():
         m['mod_r_pma'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_Reactor_PMA_Flow_kmol_h.h5'), compile=False)
         m['mod_r_aa'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_Reactor_AA_Flow_kmol_h.h5'), compile=False)
         m['mod_r_pgme'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_Reactor_PGME_Flow_kmol_h.h5'), compile=False)
-        
-        # --- 加載最新 ReLU 能耗模型 ---
         m['s_ene_hifi'] = pickle.load(open(os.path.join(model_dir, 'energy_hifi_scalers.pkl'), 'rb'))
         m['mod_d_ene'] = {
             'C1_Cond': tf.keras.models.load_model(os.path.join(model_dir, 'model_ann_energy_C1_Cond_relu_log.h5'), compile=False),
@@ -92,10 +90,11 @@ try:
     
     total_sep, ene_vals = 0, {}
     for t in ['C1_Cond', 'C1_Reb', 'C2_Cond', 'C2_Reb']:
-        p_log = M['mod_d_ene'][t[:2]+t[3:4]].predict(M['s_ene_hifi'][t]['sx'].transform(x_pu_in), verbose=0)[0,0]
+        p_log = M['mod_d_ene'][t].predict(M['s_ene_hifi'][t]['sx'].transform(x_pu_in), verbose=0)[0,0]
         v = 10**p_log; ene_vals[t] = v; total_sep += v
 
-    total_yield = (m_flow / (min(aa_in, pg_in) + 1e-9)) * 100
+    limiting_in_mol = min(aa_in, pg_in)
+    total_yield = (m_flow / (limiting_in_mol + 1e-9)) * 100
     
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("✨ 預測純度", f"{purity:.4f} %"); col1.progress(float(np.clip(purity/100, 0.0, 1.0)))
@@ -126,5 +125,5 @@ try:
             "Case 3 (平衡)": ["108.62", "73.04", "0.464", "5.87/9.77/9118", "8.69/9.95/7941", "99.9949", "62.45", "49.19", "9064.29"]
         }))
 except Exception as e:
-    st.error(f"錯誤: {e}")
+    st.error(f"運行錯誤: {e}")
 st.caption("PMA AI Optimization System © 2023 | 驅動於 v7 ReLU 高精度模型")
