@@ -31,7 +31,13 @@ st.write("本平台模型已完成 DWSIM 數據校正與物理載荷優化。")
 if os.path.exists("電子級PMA 製程流程圖.png"):
     st.image("電子級PMA 製程流程圖.png", caption="電子級 PMA 生產製程流程圖", use_container_width=True)
 
-MW_PMA = 132.16
+# 分子量常數
+MW = {
+    'AA': 60.05,
+    'PGME': 90.12,
+    'PMA': 132.16,
+    'Water': 18.02
+}
 
 @st.cache_resource
 def load_models():
@@ -101,6 +107,7 @@ try:
     r_pma_out = np.expm1(M['s_r1_y']['Reactor PMA Flow (kmol/h)'].inverse_transform(M['mod_r_pma'].predict(r_in_s, verbose=0)))[0,0]
     r_aa_out = np.expm1(M['s_r1_y']['Reactor AA Flow (kmol/h)'].inverse_transform(M['mod_r_aa'].predict(r_in_s, verbose=0)))[0,0]
     r_pg_out = np.expm1(M['s_r1_y']['Reactor PGME Flow (kmol/h)'].inverse_transform(M['mod_r_pgme'].predict(r_in_s, verbose=0)))[0,0]
+    r_water_out = r_pma_out # 產率 1:1
     
     aa_in, pg_in = Fin*Raa, Fin*(1-Raa)
     aa_conv = (aa_in - r_aa_out) / (aa_in + 1e-9) * 100
@@ -142,22 +149,45 @@ try:
     limiting_in_mol = min(aa_in, pg_in)
     total_yield = (m_flow / (limiting_in_mol + 1e-9)) * 100
     
-    # UI 呈現
+    # UI 呈現 (Top Metrics)
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("✨ 預測純度", f"{purity:.4f} %")
     c2.metric("📈 總產率", f"{total_yield:.2f} %")
-    c3.metric("📦 產量 (kg/h)", f"{m_flow*MW_PMA:.2f}")
+    c3.metric("📦 產量 (kg/h)", f"{m_flow*MW['PMA']:.2f}")
     c4.metric("🧪 AA (ppm)", f"{aa_ppm:.2f}")
     c5.metric("⚡ 總能耗 (kW)", f"{total_sys_ene:.2f}")
 
     st.write("---")
     t1, t2, t3 = st.tabs(["📌 反應器詳情", "📌 分離塔詳情", "🏆 最佳優化方案"])
+    
     with t1:
-        st.table(pd.DataFrame({"組分": ["AA", "PGME", "PMA"], "反應器出口 (kmol/h)": [f"{r_aa_out:.4f}", f"{r_pg_out:.4f}", f"{r_pma_out:.4f}"]}))
+        st.markdown("#### **組分流量詳細分析 (kmol/h & kg/h)**")
+        reactor_df = pd.DataFrame({
+            "組分": ["AA (醋酸)", "PGME (丙二醇甲醚)", "PMA (產品)", "Water (水)"],
+            "莫耳流量 (kmol/h)": [f"{r_aa_out:.4f}", f"{r_pg_out:.4f}", f"{r_pma_out:.4f}", f"{r_water_out:.4f}"],
+            "質量流率 (kg/h)": [f"{r_aa_out*MW['AA']:.2f}", f"{r_pg_out*MW['PGME']:.2f}", f"{r_pma_out*MW['PMA']:.2f}", f"{r_water_out*MW['Water']:.2f}"]
+        })
+        st.table(reactor_df)
+        st.info(f"**限量試劑:** {lim_reagent} | **AA 轉化率:** {aa_conv:.2f} % | **加熱器能耗:** {h_ene:.2f} kW")
+
     with t2:
-        st.table(pd.DataFrame({"換熱器": ["C1冷凝", "C1再沸", "C2冷凝", "C2再沸"], "負荷 (kW)": [f"{ene_vals['C1_Cond']:.2f}", f"{ene_vals['C1_Reb']:.2f}", f"{ene_vals['C2_Cond']:.2f}", f"{ene_vals['C2_Reb']:.2f}"]}))
+        st.markdown("#### **分離塔 Y 輸出指標與能耗詳情**")
+        sep_col1, sep_col2 = st.columns(2)
+        with sep_col1:
+            st.write("**分離效能指標**")
+            st.success(f"產品莫耳流量: {m_flow:.4f} kmol/h")
+            st.success(f"產品質量流量: {m_flow*MW['PMA']:.2f} kg/h")
+            st.success(f"最終產品純度: {purity:.4f} %")
+            st.success(f"AA 殘留量: {aa_ppm:.2f} ppm")
+        with sep_col2:
+            st.write("**設備熱負荷詳情 (kW)**")
+            st.table(pd.DataFrame({
+                "設備名稱": ["C1 冷凝器", "C1 再沸器", "C2 冷凝器", "C2 再沸器"],
+                "熱負荷 (kW)": [f"{ene_vals['C1_Cond']:.2f}", f"{ene_vals['C1_Reb']:.2f}", f"{ene_vals['C2_Cond']:.2f}", f"{ene_vals['C2_Reb']:.2f}"]
+            }))
+
     with t3:
-        st.markdown("#### **校正後 [256, 128, 64] 架構最佳建議方案**")
+        st.markdown("#### **搜尋5000組後最佳優化方案**")
         st.table(pd.DataFrame({
             "指標": ["反應溫度", "進料流量", "AA 進料比", "C1 R/B/P", "C2 R/B/P", "純度 (%)", "AA (ppm)", "產品流量 (kmol/h)", "總能耗 (kW)", "產率 (%)"],
             "Case 1 (節能優先)": ["85.49", "24.49", "0.473", "1.55/9.72/9720", "8.90/3.29/8113", "99.9919", "34.4", "2.42", "1328.7", "20.90"],
