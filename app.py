@@ -6,27 +6,12 @@ import pickle
 import tensorflow as tf
 
 # 設定網頁標題與版面
-st.set_page_config(page_title="ANN 電子級 PMA 優化系統 - 校正版", layout="wide")
-
-# --- Google Analytics 匿名統計 ---
-GA_ID = 'G-7TKCC4EV45'
-ga_injection = f"""
-    <script>
-        var script = window.parent.document.createElement('script');
-        script.async = true;
-        script.src = "https://www.googletagmanager.com/gtag/js?id={GA_ID}";
-        window.parent.document.head.appendChild(script);
-        window.parent.window.dataLayer = window.parent.window.dataLayer || [];
-        function gtag(){{window.parent.window.dataLayer.push(arguments);}}
-        gtag('js', new Date());
-        gtag('config', '{GA_ID}');
-    </script>
-"""
-st.components.v1.html(ga_injection, height=0)
+st.set_page_config(page_title="ANN 電子級 PMA 優化系統", layout="wide")
 
 st.title("人工類神經網路（ANN）應用於電子級 PMA 製程之產率預測與參數優化")
-st.write("本平台為碩士研究相關之電子級 PMA 製程預測與操作條件分析展示頁面。模型已完成 DWSIM 數據校正與物理載荷優化。")
+st.write("本平台模型已完成 DWSIM 數據校正與物理載荷優化。")
 
+# 檢查圖片是否存在
 if os.path.exists("電子級PMA 製程流程圖.png"):
     st.image("電子級PMA 製程流程圖.png", caption="電子級 PMA 生產製程流程圖", use_container_width=True)
 
@@ -36,8 +21,13 @@ MW_PMA = 132.16
 def load_models():
     model_dir = 'deploy_models'
     m = {}
+    # 檢查資料夾是否存在
+    if not os.path.exists(model_dir):
+        st.error(f"❌ 錯誤: 找不到 '{model_dir}' 資料夾，請確認已上傳至 GitHub。")
+        st.stop()
+        
     try:
-        # 1. 核心與品質模型
+        # 1. 品質模型
         m['s_pu'] = pickle.load(open(os.path.join(model_dir, 'purity_scalers.pkl'), 'rb'))
         m['mod_pu'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_purity_expert_log.h5'), compile=False)
         m['s_aa'] = pickle.load(open(os.path.join(model_dir, 'aa_ppm_scalers.pkl'), 'rb'))
@@ -54,7 +44,7 @@ def load_models():
             'C2_Reb': tf.keras.models.load_model(os.path.join(model_dir, 'model_stage2_C2_Reb_optimized.h5'), compile=False)
         }
         
-        # 3. 反應器階段模型
+        # 3. 反應器模型
         m['s_r1'] = pickle.load(open(os.path.join(model_dir, 'x_scaler.pkl'), 'rb'))
         m['s_r1_y'] = pickle.load(open(os.path.join(model_dir, 'y_scalers.pkl'), 'rb'))
         m['mod_r_ene'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_Heater_Energy_Consumption_kW.h5'), compile=False)
@@ -63,9 +53,12 @@ def load_models():
         m['mod_r_pgme'] = tf.keras.models.load_model(os.path.join(model_dir, 'model_Reactor_PGME_Flow_kmol_h.h5'), compile=False)
         
     except Exception as e:
-        st.error(f"加載模型出錯: {e}"); st.stop()
+        st.error(f"❌ 模型檔案載入失敗: {e}")
+        st.write("請確認 deploy_models 資料夾內包含所有 17 個 .h5 與 .pkl 檔案。")
+        st.stop()
     return m
 
+# 側邊欄輸入
 with st.sidebar:
     st.header("⚙️ 操作參數輸入")
     with st.expander("🔹 反應器階段", expanded=True):
@@ -104,7 +97,7 @@ try:
                             columns=['R_AA', 'R_PGME', 'R_PMA', 'C1_R', 'C1_B', 'C1_P', 'C2_R', 'C2_B', 'C2_P', 'C1_Load', 'C2_Load', 'C1_Vap', 'C2_Vap'])
     x_opt_s = M['s_ene_opt_x'].transform(x_opt_in)
 
-    # 產品流量與能耗預測 (使用校正後的 Log+StandardScaler 邏輯)
+    # 產品流量與能耗預測
     s_y_fl = M['s_ene_opt_y']['Product_Flow']
     m_flow_raw = np.expm1(s_y_fl.inverse_transform(M['mod_fl'].predict(x_opt_s, verbose=0).reshape(-1, 1))[0,0])
     m_flow = min(m_flow_raw, r_pma_out * 0.99)
@@ -117,7 +110,7 @@ try:
         v_abs = abs(v)
         ene_vals[t] = v_abs; total_sep += v_abs
 
-    # 品質預測 (AA PPM & Purity)
+    # 品質預測
     x_in_aa = pd.DataFrame([[T, Fin, Raa, C1_R, C1_B, C1_P, C2_R, C2_B, C2_P]], 
                            columns=['T', 'Flow_In', 'Ratio_AA', 'C1_R', 'C1_B', 'C1_P', 'C2_R', 'C2_B', 'C2_P'])
     aa_ppm = np.expm1(M['s_aa']['y_s'].inverse_transform(M['mod_aa'].predict(M['s_aa']['x_s'].transform(x_in_aa), verbose=0)))[0,0]
@@ -130,43 +123,20 @@ try:
     limiting_in_mol = min(aa_in, pg_in)
     total_yield = (m_flow / (limiting_in_mol + 1e-9)) * 100
     
-    # UI 主面版
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("✨ 預測純度", f"{purity:.4f} %"); col1.progress(float(np.clip(purity/100, 0.0, 1.0)))
-    with col2:
-        st.metric("📈 總產率", f"{total_yield:.2f} %")
-        with st.popover("🧮 計算方式"):
-            st.write(f"限量試劑進料: {limiting_in_mol:.4f} kmol/h")
-            st.latex(r"Yield = \frac{\text{Product Flow}}{\min(\text{AA, PGME})} \times 100\%")
-    col3.metric("📦 質量流率", f"{m_flow*MW_PMA:.2f} kg/h", f"{m_flow:.4f} kmol/h")
-    col4.metric("🧪 AA 含量", f"{aa_ppm:.2f} ppm")
-    col5.metric("⚡ 系統總能耗", f"{total_sys_ene:.2f} kW")
+    # UI 呈現
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("✨ 預測純度", f"{purity:.4f} %")
+    c2.metric("📈 總產率", f"{total_yield:.2f} %")
+    c3.metric("📦 產量 (kg/h)", f"{m_flow*MW_PMA:.2f}")
+    c4.metric("🧪 AA (ppm)", f"{aa_ppm:.2f}")
+    c5.metric("⚡ 總能耗 (kW)", f"{total_sys_ene:.2f}")
 
     st.write("---")
-    t1, t2, t3 = st.tabs(["📌 反應器詳情", "📌 分離塔詳情", "🏆 最佳優化方案 (校正版)"])
+    t1, t2, t3 = st.tabs(["📌 反應器詳情", "📌 分離塔詳情", "🏆 最佳優化方案"])
     with t1:
-        cc1, cc2 = st.columns(2)
-        with cc1:
-            st.markdown("#### **組分流量 (kmol/h)**")
-            st.table(pd.DataFrame({
-                "組分": ["AA", "PGME", "PMA", "H2O"], 
-                "反應器進料": [f"{aa_in:.4f}", f"{pg_in:.4f}", "0.0000", "0.0000"], 
-                "反應器出口": [f"{r_aa_out:.4f}", f"{r_pg_out:.4f}", f"{r_pma_out:.4f}", f"{r_pma_out:.4f}"]
-            }))
-        with cc2:
-            st.info(f"**限量試劑:** {lim_reagent}"); st.info(f"**AA 轉化率:** {aa_conv:.2f} %"); st.info(f"**Heater 能耗:** {h_ene:.2f} kW")
+        st.table(pd.DataFrame({"組分": ["AA", "PGME", "PMA"], "反應器出口 (kmol/h)": [f"{r_aa_out:.4f}", f"{r_pg_out:.4f}", f"{r_pma_out:.4f}"]}))
     with t2:
-        cc3, cc4 = st.columns(2)
-        with cc3:
-            st.markdown("#### **分離能耗詳情 (kW)**")
-            st.table(pd.DataFrame({
-                "項目": ["C1 Condenser", "C1 Reboiler", "C2 Condenser", "C2 Reboiler"], 
-                "預測負荷 (kW)": [f"{ene_vals['C1_Cond']:.2f}", f"{ene_vals['C1_Reb']:.2f}", f"{ene_vals['C2_Cond']:.2f}", f"{ene_vals['C2_Reb']:.2f}"]
-            }))
-        with cc4:
-            st.markdown("#### **物理載荷 (Physics Load)**")
-            st.write(f"C1 處理負荷: {C1_Load:.2f}"); st.write(f"C2 處理負荷: {C2_Load:.2f}")
-            st.success(f"**單位能耗:** {total_sys_ene/(m_flow*MW_PMA+1e-9):.4f} kW/kg")
+        st.table(pd.DataFrame({"換熱器": ["C1冷凝", "C1再沸", "C2冷凝", "C2再沸"], "負荷 (kW)": [f"{ene_vals['C1_Cond']:.2f}", f"{ene_vals['C1_Reb']:.2f}", f"{ene_vals['C2_Cond']:.2f}", f"{ene_vals['C2_Reb']:.2f}"]}))
     with t3:
         st.markdown("#### **校正後 [256, 128, 64] 架構最佳建議方案**")
         st.table(pd.DataFrame({
@@ -177,5 +147,6 @@ try:
         }))
 
 except Exception as e:
-    st.error(f"運行錯誤: {e}")
-st.caption("PMA AI Optimization System © 2026 | 模型架構 [256, 128, 64] | 物理載荷校正版")
+    st.error(f"執行出錯: {e}")
+
+st.caption("PMA AI Optimization System © 2026 | 模型架構 [256, 128, 64]")
