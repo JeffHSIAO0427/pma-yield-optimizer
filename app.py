@@ -209,5 +209,4 @@ try:
 except Exception as e:
     st.error(f"執行出錯: {e}")
 
-st.caption("PMA AI Optimization System © 2026 | 碩士論文研究成果展示 | 模型架構 [256, 128, 64]")
-tion System © 2026 | 模型架構 [256, 128, 64]")
+st.caption("PMA AI Optimization System (c) 2026 | 碩士論文研究成果展示 | 模型架構 [256, 128, 64]")
