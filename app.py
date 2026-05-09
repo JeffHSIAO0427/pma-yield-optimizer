@@ -111,7 +111,9 @@ try:
     
     aa_in, pg_in = Fin*Raa, Fin*(1-Raa)
     aa_conv = (aa_in - r_aa_out) / (aa_in + 1e-9) * 100
+    pgme_conv = (pg_in - r_pg_out) / (pg_in + 1e-9) * 100
     lim_reagent = "AA (醋酸)" if aa_in < pg_in else "PGME (丙二醇甲醚)"
+    lim_in_mol = min(aa_in, pg_in)
 
     # 分離塔物理特徵
     C1_Load = r_pma_out * (C1_R + 1.0)
@@ -146,13 +148,19 @@ try:
     purity = np.clip(100.0001 - (10**p_log_res), 0, 100)
 
     total_sys_ene = h_ene + total_sep
-    limiting_in_mol = min(aa_in, pg_in)
-    total_yield = (m_flow / (limiting_in_mol + 1e-9)) * 100
+    total_yield = (m_flow / (lim_in_mol + 1e-9)) * 100
     
     # UI 呈現 (Top Metrics)
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("✨ 預測純度", f"{purity:.4f} %")
-    c2.metric("📈 總產率", f"{total_yield:.2f} %")
+    with c2:
+        st.metric("📈 總產率", f"{total_yield:.2f} %")
+        with st.popover("📖 產率定義"):
+            st.markdown("**總產率 (Overall Yield) 定義：**")
+            st.latex(r"Yield = \frac{n_{PMA, product}}{n_{limiting, feed}} \times 100\%")
+            st.write(f"- 限量試劑: {lim_reagent}")
+            st.write(f"- 限量試劑進料: {lim_in_mol:.4f} kmol/h")
+            st.write(f"- 最終產品流量: {m_flow:.4f} kmol/h")
     c3.metric("📦 產量 (kg/h)", f"{m_flow*MW['PMA']:.2f}")
     c4.metric("🧪 AA (ppm)", f"{aa_ppm:.2f}")
     c5.metric("⚡ 總能耗 (kW)", f"{total_sys_ene:.2f}")
@@ -168,7 +176,10 @@ try:
             "質量流率 (kg/h)": [f"{r_aa_out*MW['AA']:.2f}", f"{r_pg_out*MW['PGME']:.2f}", f"{r_pma_out*MW['PMA']:.2f}", f"{r_water_out*MW['Water']:.2f}"]
         })
         st.table(reactor_df)
-        st.info(f"**限量試劑:** {lim_reagent} | **AA 轉化率:** {aa_conv:.2f} % | **加熱器能耗:** {h_ene:.2f} kW")
+        st.markdown(f"**限量試劑:** {lim_reagent} | **加熱器能耗:** {h_ene:.2f} kW")
+        cc1, cc2 = st.columns(2)
+        cc1.info(f"**AA 轉化率:** {aa_conv:.2f} %")
+        cc2.info(f"**PGME 轉化率:** {pgme_conv:.2f} %")
 
     with t2:
         st.markdown("#### **分離塔 Y 輸出指標與能耗詳情**")
