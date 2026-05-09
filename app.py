@@ -8,6 +8,22 @@ import tensorflow as tf
 # 設定網頁標題與版面
 st.set_page_config(page_title="ANN 電子級 PMA 優化系統", layout="wide")
 
+# --- Google Analytics 匿名統計 ---
+GA_ID = 'G-7TKCC4EV45'
+ga_injection = f"""
+    <script>
+        var script = window.parent.document.createElement('script');
+        script.async = true;
+        script.src = "https://www.googletagmanager.com/gtag/js?id={GA_ID}";
+        window.parent.document.head.appendChild(script);
+        window.parent.window.dataLayer = window.parent.window.dataLayer || [];
+        function gtag(){{window.parent.window.dataLayer.push(arguments);}}
+        gtag('js', new Date());
+        gtag('config', '{GA_ID}');
+    </script>
+"""
+st.components.v1.html(ga_injection, height=0)
+
 st.title("人工類神經網路（ANN）應用於電子級 PMA 製程之產率預測與參數優化")
 st.write("本平台模型已完成 DWSIM 數據校正與物理載荷優化。")
 
@@ -77,7 +93,10 @@ with st.sidebar:
 try:
     M = load_models()
     # 反應器預測
-    r_in_s = M['s_r1'].transform(pd.DataFrame([[T, Fin, Raa, 1-Raa]], columns=['Temperature (°C)', 'Total Feed Molar Flow (kmol/h)', 'Feed Molar Fraction (AA)', 'Feed Molar Fraction (PGME)']))
+    r_in_data = pd.DataFrame([[T, Fin, Raa, 1-Raa]], 
+                             columns=['Temperature (°C)', 'Total Feed Molar Flow (kmol/h)', 'Feed Molar Fraction (AA)', 'Feed Molar Fraction (PGME)'])
+    r_in_s = M['s_r1'].transform(r_in_data)
+    
     h_ene = M['s_r1_y']['Heater Energy Consumption (kW)'].inverse_transform(M['mod_r_ene'].predict(r_in_s, verbose=0))[0,0]
     r_pma_out = np.expm1(M['s_r1_y']['Reactor PMA Flow (kmol/h)'].inverse_transform(M['mod_r_pma'].predict(r_in_s, verbose=0)))[0,0]
     r_aa_out = np.expm1(M['s_r1_y']['Reactor AA Flow (kmol/h)'].inverse_transform(M['mod_r_aa'].predict(r_in_s, verbose=0)))[0,0]
