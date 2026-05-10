@@ -25,7 +25,7 @@ ga_injection = f"""
 st.components.v1.html(ga_injection, height=0)
 
 st.title("人工類神經網路（ANN）應用於電子級 PMA 製程之產率預測與參數優化")
-st.write("本平台模型已完成 DWSIM 數據校正與物理載荷優化。")
+st.write("本平台為碩士論文研究開發之電子級 PMA 製程預測與操作條件分析系統")
 
 # 檢查圖片是否存在
 if os.path.exists("電子級PMA 製程流程圖.png"):
