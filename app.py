@@ -123,6 +123,14 @@ try:
     r_pma = np.expm1(M['s_r1_y']['Reactor PMA Flow (kmol/h)'].inverse_transform(M['mod_r_pma'].predict(r_in_s, verbose=0)))[0,0]
     r_aa = np.expm1(M['s_r1_y']['Reactor AA Flow (kmol/h)'].inverse_transform(M['mod_r_aa'].predict(r_in_s, verbose=0)))[0,0]
     r_pg = np.expm1(M['s_r1_y']['Reactor PGME Flow (kmol/h)'].inverse_transform(M['mod_r_pgme'].predict(r_in_s, verbose=0)))[0,0]
+    r_water_out = r_pma # 產率 1:1
+    
+    # [Reaction Performance Logic]
+    aa_in, pg_in = Fin*Raa, Fin*Rpg
+    aa_conv = (aa_in - r_aa) / (aa_in + 1e-9) * 100
+    pgme_conv = (pg_in - r_pg) / (pg_in + 1e-9) * 100
+    lim_reagent = "AA (醋酸)" if aa_in < pg_in else "PGME (丙二醇甲醚)"
+    lim_in_mol = min(aa_in, pg_in)
     
     # [Separation Stage]
     C1_L, C2_L = r_pma * (C1_R + 1.0), r_pma * (C2_R + 1.0)
