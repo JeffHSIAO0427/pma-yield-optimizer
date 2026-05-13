@@ -182,9 +182,16 @@ try:
         }))
 
     with tabs[1]:
-        st.markdown("#### **反應器組分流量詳細分析**")
+        st.markdown("#### **反應器反應效能分析**")
+        cc1, cc2, cc3 = st.columns(3)
+        cc1.metric("⚖️ 限量試劑", lim_reagent)
+        cc2.metric("📉 AA 轉化率", f"{aa_conv:.2f} %")
+        cc3.metric("📉 PGME 轉化率", f"{pgme_conv:.2f} %")
+        
+        st.markdown("---")
+        st.markdown("#### **反應器組分流率詳細分析 (Outlet)**")
         st.table(pd.DataFrame({
-            "組分": ["AA", "PGME", "PMA", "Water"],
+            "組分 (Component)": ["AA (醋酸)", "PGME (丙二醇甲醚)", "PMA (產品)", "Water (副產物)"],
             "莫耳流量 (kmol/h)": [f"{r_aa:.4f}", f"{r_pg:.4f}", f"{r_pma:.4f}", f"{r_pma:.4f}"],
             "質量流率 (kg/h)": [f"{r_aa*MW['AA']:.2f}", f"{r_pg*MW['PGME']:.2f}", f"{r_pma*MW['PMA']:.2f}", f"{r_pma*MW['Water']:.2f}"]
         }))
