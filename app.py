@@ -169,6 +169,10 @@ try:
         st.metric("Product Flow (Molar)", f"{m_flow:.4f} kmol/h")
         st.metric("Product Flow (Mass)", f"{m_flow*MW['PMA']:.2f} kg/h")
         st.metric("Total Overall Yield", f"{total_yield:.2f} %")
+        with st.popover("📖 總產率定義"):
+            st.markdown("**總產率 (Overall Yield)**：")
+            st.latex(r"Yield_{Overall} = \frac{n_{PMA, product}}{\min(n_{AA, feed}, n_{PGME, feed})} \times 100\%")
+            st.caption("基於限量試劑之莫耳流量計算。")
 
     with res_e:
         st.markdown("#### **C. 能耗表現**")
@@ -197,6 +201,10 @@ try:
         cc1.metric("⚖️ 限量試劑", lim_reagent)
         cc2.metric("📉 AA 轉化率", f"{aa_conv:.2f} %")
         cc3.metric("📉 PGME 轉化率", f"{pgme_conv:.2f} %")
+        with st.popover("📖 轉化率定義"):
+            st.markdown("**轉化率 (Conversion Rate)**：")
+            st.latex(r"X_i = \frac{n_{i, in} - n_{i, out}}{n_{i, in}} \times 100\%")
+            st.caption("其中 $n_{i, in}$ 為反應器進料莫耳流量，$n_{i, out}$ 為反應器出口莫耳流量。")
         
         st.markdown("---")
         st.markdown("#### **反應器組分流率詳細分析 (Outlet)**")
