@@ -151,7 +151,10 @@ try:
         st.markdown("#### **A. 產品品質**")
         st.metric("PMA Product Purity", f"{purity:.4f} %")
         st.metric("AA Residue", f"{aa_ppm:.2f} ppm")
-        st.success("✅ 符合電子級規格") if is_spec else st.error("❌ 未達電子級規格")
+        if is_spec:
+            st.success("✅ 符合電子級規格")
+        else:
+            st.error("❌ 未達電子級規格")
 
     with res_p:
         st.markdown("#### **B. 產能表現**")
