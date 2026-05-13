@@ -190,7 +190,7 @@ try:
         st.markdown("#### **分離塔(蒸餾)階段質量平衡與回收率**")
         st.table(pd.DataFrame({
             "指標項目": ["最終產品莫耳流量 (kmol/h)", "最終產品質量流率 (kg/h)", "分離階段產率 (Separation Yield %)", "C1 冷凝器負荷 (kW)", "C1 再沸器負荷 (kW)", "C2 冷凝器負荷 (kW)", "C2 再沸器負荷 (kW)"],
-            "預測數值": [f"{m_flow:.4f}", f"{m_flow*MW['PMA']:.2f}", f"{sep_yield:.2f}%", f"{ene_dict['C1_Cond']:.2f}", f"{ene_vals['C1_Reb']:.2f}", f"{ene_vals['C2_Cond']:.2f}", f"{ene_vals['C2_Reb']:.2f}"]
+            "預測數值": [f"{m_flow:.4f}", f"{m_flow*MW['PMA']:.2f}", f"{sep_yield:.2f}%", f"{ene_dict['C1_Cond']:.2f}", f"{ene_dict['C1_Reb']:.2f}", f"{ene_dict['C2_Cond']:.2f}", f"{ene_dict['C2_Reb']:.2f}"]
         }))
         with st.popover("📖 分離產率定義"):
             st.latex(r"Separation Yield = \frac{n_{PMA, product}}{n_{PMA, reactor\_out}} \times 100\%")
