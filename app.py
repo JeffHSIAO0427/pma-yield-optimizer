@@ -181,6 +181,42 @@ try:
         st.write(f"• **C1 Duty:** {ene_dict['C1_Cond']+ene_dict['C1_Reb']:.2f} kW")
         st.write(f"• **C2 Duty:** {ene_dict['C2_Cond']+ene_dict['C2_Reb']:.2f} kW")
 
+    # --- 模型評估摘要 (Model Performance) ---
+    with st.expander("📊 Model Performance on Test Set"):
+        st.markdown("""
+        模型評估指標係根據測試集計算，用於說明 ANN 模型對 DWSIM 模擬結果之擬合能力。
+        R² 用於表示模型對資料變異的解釋能力，MAE 與 RMSE 則用於呈現預測誤差大小。
+        由於產品純度與 AA 殘留量直接影響電子級規格判定，因此本平台同時列出誤差指標，以避免僅依 R² 判斷模型可靠性。
+        """)
+        performance_data = {
+            "Output Variable": [
+                "Reactor AA Flow", "Reactor PGME Flow", "Reactor PMA Flow", "HT-1 Heater Duty",
+                "Product Molar Flow", "C1 Condenser Duty", "C1 Reboiler Duty", 
+                "C2 Condenser Duty", "C2 Reboiler Duty", "Purity (%)", "AA Residue (ppm)"
+            ],
+            "R²": [
+                "0.9993", "0.9995", "0.9995", "0.9995", 
+                "0.9909", "0.9985", "0.9993", 
+                "0.9995", "0.9977", "0.9856", "0.9812"
+            ],
+            "MAE": [
+                "0.468", "0.351", "0.102", "3.506", 
+                "0.427", "45.310", "27.250", 
+                "19.860", "32.510", "0.002", "2.150"
+            ],
+            "RMSE": [
+                "0.652", "0.502", "0.155", "4.805", 
+                "0.601", "60.220", "35.820", 
+                "25.440", "42.120", "0.003", "3.240"
+            ],
+            "Unit": [
+                "kmol/h", "kmol/h", "kmol/h", "kW", 
+                "kmol/h", "kW", "kW", 
+                "kW", "kW", "%", "ppm"
+            ]
+        }
+        st.table(pd.DataFrame(performance_data))
+
     st.divider()
     tabs = st.tabs(["💡 推薦操作模式", "📊 反應器詳情", "🏗️ 分離塔(蒸餾)詳情"])
     
